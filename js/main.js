@@ -414,7 +414,7 @@ $(function(){
 	});
 	stringToGraph(window.localStorage.graph);
 	window.onmousewheel=function(event){
-		let step=event.deltaY/100;
+		let step=-event.deltaY/100;
 		for(let i=0;i<step;i++){
 			points.forEach(function(point){
 				point.moveTo((point.getX()-event.clientX)*0.9+event.clientX,(point.getY()-event.clientY)*0.9+event.clientY);
