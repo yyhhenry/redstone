@@ -301,14 +301,6 @@ $(function(){
 				});
 			}
 		}else{
-			if(focus!=null&&focus.click(event)){
-				if(focus.getType()=='Point'){
-					focus.setPower();
-				}else{
-					focus.setNotGate();
-				}
-				return;
-			}
 			focus=null;
 			points.forEach(function(point){
 				if(focus!=null&&focus.getType()=='Point')return;
