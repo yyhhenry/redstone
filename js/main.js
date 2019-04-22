@@ -20,7 +20,6 @@ $(function(){
 	let tick=1000;
 	let focus=null;
 	let ctrl=false;
-	let shift=false;
 	Point=function(x,y){
 		let thisPoint=this;
 		let connectedLines=new Set();
@@ -232,15 +231,11 @@ $(function(){
 	$(window).keydown(function(event){
 		if(event.key=='Control'){
 			ctrl=true;
-		}else if(event.key=='Shift'){
-			shift=true;
 		}
 	});
 	$(window).keyup(function(event){
 		if(event.key=='Control'){
 			ctrl=false;
-		}else if(event.key=='Shift'){
-			shift=false;
 		}else if(event.key==' '){
 			if(focus!=null){
 				if(focus.getType()=='Point'){
@@ -256,12 +251,22 @@ $(function(){
 			}
 		}
 	});
+	let movePoint=false;
+	$(window).mousedown(function(event){
+		if(focus!=null&&focus.getType()=='Point'&&focus.click(event)){
+			movePoint=true;
+		}
+	});
+	$(window).mouseup(function(event){
+		movePoint=false;
+	});
+	$(window).mousemove(function(event){
+		if(movePoint){
+			focus.moveTo(event.clientX,event.clientY);
+		}
+	});
 	$(window).click(function(event){
-		if(shift){
-			if(focus!=null&&focus.getType()=='Point'){
-				focus.moveTo(event.clientX,event.clientY);
-			}
-		}else if(ctrl){
+		if(ctrl){
 			if(focus==null){
 				focus=new Point(event.clientX,event.clientY);
 			}else{
@@ -361,6 +366,7 @@ $(function(){
 			"points":[
 		`;
 		for(let i=0;i<arrayOfPoints.length;i++){
+			arrayOfPoints[i].count=i;
 			ans+=`
 				{
 					"x":${arrayOfPoints[i].getX()},
@@ -374,11 +380,7 @@ $(function(){
 			"lines":[
 		`;
 		function findPoint(point){
-			for(let i=0;i<arrayOfPoints.length;i++){
-				if(arrayOfPoints[i]==point){
-					return i;
-				}
-			}
+			return point.count;
 		}
 		for(let i=0;i<arrayOfLines.length;i++){
 			ans+=`
@@ -399,4 +401,17 @@ $(function(){
 		window.localStorage.graph=graphToString();
 	});
 	stringToGraph(window.localStorage.graph);
+	window.onmousewheel=function(event){
+		let step=event.deltaY/100;
+		for(let i=0;i<step;i++){
+			points.forEach(function(point){
+				point.moveTo((point.getX()-event.clientX)*0.9+event.clientX,(point.getY()-event.clientY)*0.9+event.clientY);
+			});
+		}
+		for(let i=0;i<-step;i++){
+			points.forEach(function(point){
+				point.moveTo((point.getX()-event.clientX)/0.9+event.clientX,(point.getY()-event.clientY)/0.9+event.clientY);
+			});
+		}
+	}
 });
