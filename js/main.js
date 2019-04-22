@@ -27,7 +27,13 @@ $(function(){
 		let power=false;
 		let value=0;
 		this.click=function(event){
-			return (event.clientX>=x-10&&event.clientX<=x+10&&event.clientY>=y-10&&event.clientY<=y+10);
+			function dis(x1,y1,x2,y2){
+				return Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
+			}
+			if(event.clientX>=x-10&&event.clientX<=x+10&&event.clientY>=y-10&&event.clientY<=y+10){
+				return dis(event.clientX,event.clientY,x,y);
+			}
+			return null;
 		}
 		this.getType=function(){
 			return 'Point';
@@ -251,18 +257,24 @@ $(function(){
 			}
 		}
 	});
-	let movePoint=false;
+	let movePoint=null;
 	$(window).mousedown(function(event){
-		if(focus!=null&&focus.getType()=='Point'&&focus.click(event)){
-			movePoint=true;
+		let arrayOfPoints=Array.from(points);
+		let va=20;
+		for(let i=0;i<arrayOfPoints.length;i++){
+			let dv=arrayOfPoints[i].click(event)
+			if(dv!=null&&dv<va){
+				va=dv;
+				movePoint=arrayOfPoints[i];
+			}
 		}
 	});
 	$(window).mouseup(function(event){
-		movePoint=false;
+		movePoint=null;
 	});
 	$(window).mousemove(function(event){
-		if(movePoint){
-			focus.moveTo(event.clientX,event.clientY);
+		if(movePoint!=null){
+			movePoint.moveTo(event.clientX,event.clientY);
 		}
 	});
 	$(window).click(function(event){
@@ -274,7 +286,7 @@ $(function(){
 				focus=null;
 				let cnt=points.size;
 				points.forEach(function(point){
-					if(focus==null&&point!=pointFrom&&point.click(event)){
+					if(focus==null&&point!=pointFrom&&point.click(event)!=null){
 						focus=point;
 					}
 					cnt--;
@@ -289,10 +301,18 @@ $(function(){
 				});
 			}
 		}else{
+			if(focus!=null&&focus.click(event)){
+				if(focus.getType()=='Point'){
+					focus.setPower();
+				}else{
+					focus.setNotGate();
+				}
+				return;
+			}
 			focus=null;
 			points.forEach(function(point){
 				if(focus!=null&&focus.getType()=='Point')return;
-				if(point.click(event)){
+				if(point.click(event)!=null){
 					focus=point;
 				}
 			});
