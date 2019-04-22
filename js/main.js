@@ -54,6 +54,27 @@ $(function(){
 			let newValue=0;
 			if(power)newValue=powerValue;
 			let cnt=connectedLines.size;
+			function test(){
+				if(newValue!=value){
+					value=newValue;
+					connectedLines.forEach(function(line){
+						if(line.getNotGate()){
+							if(line.getPointFrom()==thisPoint){
+								setTimeout(line.getPointTo().fresh,0);
+							}
+						}else{
+							if(line.getPointFrom()==thisPoint){
+								setTimeout(line.getPointTo().fresh,0);
+							}else{
+								setTimeout(line.getPointFrom().fresh,0);
+							}
+						}
+					});
+				}
+			}
+			if(cnt==0){
+				test();
+			}
 			connectedLines.forEach(function(line){
 				if(line.getNotGate()){
 					if(line.getPointTo()==thisPoint&&line.getPointFrom().getValue()==0){
@@ -68,22 +89,7 @@ $(function(){
 				}
 				cnt--;
 				if(cnt==0){
-					if(newValue!=value){
-						value=newValue;
-						connectedLines.forEach(function(line){
-							if(line.getNotGate()){
-								if(line.getPointFrom()==thisPoint){
-									setTimeout(line.getPointTo().fresh,0);
-								}
-							}else{
-								if(line.getPointFrom()==thisPoint){
-									setTimeout(line.getPointTo().fresh,0);
-								}else{
-									setTimeout(line.getPointFrom().fresh,0);
-								}
-							}
-						});
-					}
+					test();
 				}
 			});
 		}
@@ -281,7 +287,7 @@ $(function(){
 		if(ctrl){
 			if(focus==null){
 				focus=new Point(event.clientX,event.clientY);
-			}else{
+			}else if(focus.getType()=='Point'){
 				let pointFrom=focus;
 				focus=null;
 				let cnt=points.size;
