@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset='utf-8'>
+		<title>Redstone - 添加</title>
+		<style>
+			.noselect {
+				-webkit-touch-callout: none;
+				-webkit-user-select: none;
+				-khtml-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+			}
+		</style>
+	</head>
+	<body style='overflow:hidden'>
+		<button id='okay'>完成</button>
+		<button id='cancel'>取消</button><br>
+		<textarea id='graphValue' style='position:fixed;top:10%;left:0;height:90%;width:100%'></textarea>
+		<script>
+			document.getElementById('okay').onclick=function(){
+				let odp=JSON.parse(window.localStorage.graph);
+				let exp=JSON.parse(document.getElementById('graphValue').value);
+				let odl=odp.points.length;
+				for(let i=0;i<exp.lines.length;i++){
+					exp.lines[i].pointFrom+=odl;
+					exp.lines[i].pointTo+=odl;
+				}
+				odp.points=odp.points.concat(exp.points);
+				odp.lines=odp.lines.concat(exp.lines);
+				window.localStorage.graph=JSON.stringify(odp);
+				location.href='./index.html'
+			}
+			document.getElementById('cancel').onclick=function(){
+				location.href='./index.html'
+			}
+		</script>
+	</body>
+</html>

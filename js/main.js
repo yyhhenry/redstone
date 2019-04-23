@@ -375,6 +375,11 @@ $(function(){
 			}
 		}
 	}
+	$('#clearGraph').click(function(){
+		points=new Set();
+		lines=new Set();
+		focus=null;
+	});
 	function graphToString(){
 		let ans='';
 		let arrayOfPoints=Array.from(points);
