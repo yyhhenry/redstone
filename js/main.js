@@ -18,11 +18,13 @@ $(function(){
 	let lines=new Set();
 	let powerValue=30;
 	let tick=1000;
-	let focus=null;
+	let focus=new Set();
 	let ctrl=false;
+	let shift=false;
 	Point=function(x,y){
 		let thisPoint=this;
 		let connectedLines=new Set();
+		let connectedPoints=new Set();
 		points.add(this);
 		let power=false;
 		let value=0;
@@ -93,15 +95,32 @@ $(function(){
 				}
 			});
 		}
+		this.hasLineTo=function(point){
+			return connectedPoints.has(point);
+		}
 		this.addLine=function(line){
+			if(line.getPointFrom()==thisPoint){
+				connectedPoints.add(line.getPointTo());
+			}else{
+				connectedPoints.add(line.getPointFrom());
+			}
 			connectedLines.add(line);
 		}
 		this.deleteLine=function(line){
+			if(line.getPointFrom()==thisPoint){
+				connectedPoints.delete(line.getPointTo());
+			}else{
+				connectedPoints.delete(line.getPointFrom());
+			}
 			connectedLines.delete(line);
 		}
 		this.setPower=function(){
 			power=!power;
 			this.fresh();
+		}
+		this.move=function(_x,_y){
+			x+=_x;
+			y+=_y;
 		}
 		this.moveTo=function(_x,_y){
 			x=_x;
@@ -121,7 +140,7 @@ $(function(){
 			}else{
 				context.fillStyle='rgb(128,128,128)';
 			}
-			if(focus==thisPoint){
+			if(focus.has(thisPoint)){
 				context.shadowColor='rgb(0,0,0)';
 				context.shadowBlur=20;
 			}else{
@@ -140,8 +159,9 @@ $(function(){
 	}
 	Line=function(pointFrom,pointTo){
 		let thisLine=this;
-		pointFrom.addLine(this);
-		pointTo.addLine(this);
+		if(pointFrom.hasLineTo(pointTo)){
+			return;
+		}
 		lines.add(this);
 		let notGate=false;
 		let swap=false;
@@ -152,7 +172,11 @@ $(function(){
 			let len=dis(pointFrom.getX(),pointFrom.getY(),pointTo.getX(),pointTo.getY());
 			let lenl=dis(pointFrom.getX(),pointFrom.getY(),event.clientX,event.clientY);
 			let lenr=dis(event.clientX,event.clientY,pointTo.getX(),pointTo.getY());
-			if(lenl+lenr-len<5)return lenl+lenr-len;
+			if(lenl>len+15||lenr>len+15)return;
+			let p=(len+lenl+lenr)/2;
+			let v=Math.sqrt(p*(p-len)*(p-lenl)*(p-lenr));
+			let ptl=v*2/len;
+			if(ptl<=15)return ptl;
 			return null;
 		}
 		this.getType=function(){
@@ -195,7 +219,7 @@ $(function(){
 		this.paint=function(context){
 			let midx=(pointFrom.getX()+pointTo.getX())/2;
 			let midy=(pointFrom.getY()+pointTo.getY())/2;
-			if(focus==thisLine){
+			if(focus.has(thisLine)){
 				context.shadowColor='rgb(0,0,0)';
 				context.shadowBlur=20;
 			}else{
@@ -237,131 +261,256 @@ $(function(){
 			context.lineWidth=5;
 			context.stroke();
 		}
+		pointFrom.addLine(this);
+		pointTo.addLine(this);
 		pointFrom.fresh();
 		pointTo.fresh();
 	}
 	$(window).keydown(function(event){
 		if(event.key=='Control'){
 			ctrl=true;
+		}else if(event.key=='Shift'){
+			shift=true;
 		}
 	});
 	$(window).keyup(function(event){
 		if(event.key=='Control'){
 			ctrl=false;
 		}else if(event.key==' '){
-			if(focus!=null){
-				if(focus.getType()=='Point'){
-					focus.setPower();
+			let _focus=Array.from(focus);
+			for(let i=0;i<_focus.length;i++){
+				let focusi=_focus[i];
+				if(focusi.getType()=='Point'){
+					focusi.setPower();
 				}else{
-					focus.setNotGate();
+					focusi.setNotGate();
 				}
 			}
 		}else if(event.key=='Delete'){
-			if(focus!=null){
-				focus.delete();
-				focus=null;
+			let _focus=Array.from(focus);
+			for(let i=0;i<_focus.length;i++){
+				let focusi=_focus[i];
+				if(focusi.getType()=='Line'){
+					focusi.delete();
+				}
 			}
+			for(let i=0;i<_focus.length;i++){
+				let focusi=_focus[i];
+				if(focusi.getType()=='Point'){
+					focusi.delete();
+				}
+			}
+			focus=new Set();
+		}else if(event.key=='Shift'){
+			shift=false;
+		}else if(ctrl&&event.key=='a'){
+			focus=new Set(Array.from(points));
+		}else if(ctrl&&event.key=='c'){
+			window.localStorage.clipboard=graphToString(focus);
+		}else if(ctrl&&event.key=='v'){
+			stringToGraph(window.localStorage.clipboard);
+		}else if(ctrl&&event.key=='x'){
+			window.localStorage.clipboard=graphToString(focus);
+			let _focus=Array.from(focus);
+			for(let i=0;i<_focus.length;i++){
+				let focusi=_focus[i];
+				if(focusi.getType()=='Line'){
+					focusi.delete();
+				}
+			}
+			for(let i=0;i<_focus.length;i++){
+				let focusi=_focus[i];
+				if(focusi.getType()=='Point'){
+					focusi.delete();
+				}
+			}
+			focus=new Set();
 		}
 	});
-	let movePoint=null;
+	let movePoint=false;
+	let selectRect=null;
+	let place={x:0,y:0};
 	$(window).mousedown(function(event){
-		let arrayOfPoints=Array.from(points);
-		let va=20;
-		for(let i=0;i<arrayOfPoints.length;i++){
-			let dv=arrayOfPoints[i].click(event)
-			if(dv!=null&&dv<va){
-				va=dv;
-				movePoint=arrayOfPoints[i];
+		place.x=event.clientX;
+		place.y=event.clientY;
+		if(ctrl){
+			if(focus.size==0){
+				focus=new Set([new Point(event.clientX,event.clientY)]);
+			}else{
+				let _focus=Array.from(focus);
+				let _points=Array.from(points);
+				let ans=null;
+				for(let i=0;i<_points.length;i++){
+					let point=_points[i];
+					if(!focus.has(ans)&&point.click(event)!=null){
+						ans=point;
+					}
+				}
+				if(ans==null){
+					ans=new Point(event.clientX,event.clientY);
+				}
+				for(let i=0;i<_focus.length;i++){
+					let focusi=_focus[i];
+					if(focusi.getType()=='Point'){
+						new Line(focusi,ans);
+					}
+				}
+				focus=new Set([ans]);
+			}
+			movePoint=true;
+		}else if(shift){
+			let _points=Array.from(points);
+			let ans=null;
+			let ansValue=-1;
+			for(let i=0;i<_points.length;i++){
+				let point=_points[i];
+				let tot=point.click(event);
+				if(tot==null)continue;
+				if(ans==null||tot<ansValue){
+					ans=point;
+					ansValue=tot;
+				}
+			}
+			if(ans!=null){
+				if(focus.has(ans)){
+					focus.delete(ans);
+				}else{
+					focus.add(ans);
+				}
+			}else{
+				selectRect={
+					x:event.clientX,
+					y:event.clientY,
+					width:0,
+					height:0
+				};
+			}
+		}else{
+			movePoint=false;
+			let _focus=Array.from(focus);
+			for(let i=0;i<_focus.length;i++){
+				let focusi=_focus[i];
+				if(focusi.getType()=='Point'){
+					if(focusi.click(event)!=null){
+						movePoint=true;
+					}
+				}
+			}
+			if(!movePoint){
+				let _points=Array.from(points);
+				let ans=null;
+				let ansValue=-1;
+				for(let i=0;i<_points.length;i++){
+					let point=_points[i];
+					let tot=point.click(event);
+					if(tot==null)continue;
+					if(ans==null||tot<ansValue){
+						ans=point;
+						ansValue=tot;
+					}
+				}
+				if(ans==null){
+					let _lines=Array.from(lines);
+					for(let i=0;i<_lines.length;i++){
+						let line=_lines[i];
+						let tot=line.click(event);
+						if(tot==null)continue;
+						if(ans==null||tot<ansValue){
+							ans=line;
+							ansValue=tot;
+						}
+					}
+				}
+				if(ans!=null){
+					focus=new Set([ans]);
+					movePoint=true;
+				}else{
+					focus=new Set();
+				}
+			}
+			if(!movePoint){
+				selectRect={
+					x:event.clientX,
+					y:event.clientY,
+					width:0,
+					height:0
+				};
 			}
 		}
 	});
 	$(window).mouseup(function(event){
-		movePoint=null;
+		movePoint=false;
+		if(selectRect!=null){
+			if(selectRect.width<0){
+				selectRect.x+=selectRect.width;
+				selectRect.width=-selectRect.width;
+			}
+			if(selectRect.height<0){
+				selectRect.y+=selectRect.height;
+				selectRect.height=-selectRect.height;
+			}
+			if(!shift){
+				focus=new Set();
+			}
+			let _points=Array.from(points);
+			for(let i=0;i<_points.length;i++){
+				let point=_points[i];
+				if(point.getX()>=selectRect.x&&point.getY()>=selectRect.y&&point.getX()<=selectRect.x+selectRect.width&&point.getY()<=selectRect.y+selectRect.height){
+					if(!shift){
+						focus.add(point);
+					}else{
+						if(focus.has(point)){
+							focus.delete(point);
+						}else{
+							focus.add(point);
+						}
+					}
+				}
+			}
+			selectRect=null;
+		}
 	});
 	$(window).mousemove(function(event){
-		if(movePoint!=null){
-			movePoint.moveTo(event.clientX,event.clientY);
-		}
-	});
-	$(window).click(function(event){
-		if(ctrl){
-			if(focus==null){
-				focus=new Point(event.clientX,event.clientY);
-			}else if(focus.getType()=='Point'){
-				let pointFrom=focus;
-				focus=null;
-				let cnt=points.size;
-				points.forEach(function(point){
-					if(focus==null&&point!=pointFrom&&point.click(event)!=null){
-						focus=point;
-					}
-					cnt--;
-					if(cnt==0){
-						if(focus==null){
-							focus=new Point(event.clientX,event.clientY);
-							new Line(pointFrom,focus);
-						}else if(!pointFrom.has(focus)){
-							new Line(pointFrom,focus);
-						}
-					}
-				});
+		if(movePoint){
+			let _focus=Array.from(focus);
+			for(let i=0;i<_focus.length;i++){
+				let focusi=_focus[i];
+				if(focusi.getType()=='Point'){
+					focusi.move(event.clientX-place.x,event.clientY-place.y);
+				}
 			}
-		}else{
-			focus=null;
-			points.forEach(function(point){
-				if(focus!=null&&focus.getType()=='Point')return;
-				if(point.click(event)!=null){
-					focus=point;
-				}
-			});
-			let linedis=10;
-			lines.forEach(function(line){
-				if(focus!=null&&focus.getType()=='Point'){
-					return;
-				}
-				let tl=line.click(event);
-				if(tl!=null){
-					if(focus!=null){
-						if(tl<linedis){
-							linedis=tl;
-							focus=line;
-						}
-					}else{
-						focus=line;
-						linedis=tl;
-					}
-				}
-			});
+		}else if(selectRect!=null){
+			selectRect.width=event.clientX-selectRect.x;
+			selectRect.height=event.clientY-selectRect.y;
 		}
+		place.x=event.clientX;
+		place.y=event.clientY;
 	});
 	window.requestAnimationFrame=window.requestAnimationFrame||window.webkitRequestAnimationFrame||window.mozRequestAnimationFrame;
 	function paint(){
 		context.shadowBlur=0;
 		context.fillStyle='rgb(255,255,255)';
 		context.fillRect(0,0,clientWidth,clientHeight);
-		let cnt=lines.size;
-		if(cnt==0){
-			points.forEach(function(points){
-				points.paint(context);
-			});
-		}
-		lines.forEach(function(line){
+		let _lines=Array.from(lines);
+		let _points=Array.from(points);
+		for(let i=0;i<_lines.length;i++){
+			let line=_lines[i];
 			line.paint(context);
-			cnt--;
-			if(cnt==0){
-				points.forEach(function(points){
-					points.paint(context);
-				});
-			}
-		});
+		}
+		for(let i=0;i<_points.length;i++){
+			let point=_points[i];
+			point.paint(context);
+		}
+		if(selectRect!=null){
+			context.shadowBlur=0;
+			context.fillStyle='rgba(40,40,160,0.2)';
+			context.fillRect(selectRect.x,selectRect.y,selectRect.width,selectRect.height);
+		}
 		window.requestAnimationFrame(paint);
 	}
 	paint();
 	function stringToGraph(exp){
-		if(exp=='')return;
-		points=new Set();
-		lines=new Set();
-		focus=null;
+		if(exp==null||exp=='')return;
 		exp=JSON.parse(exp);
 		let pointsList=[];
 		for(let i=0;i<exp.points.length;i++){
@@ -374,29 +523,33 @@ $(function(){
 				line.setNotGate();
 			}
 		}
+		focus=new Set(pointsList);
 	}
 	$('#clearGraph').click(function(){
 		points=new Set();
 		lines=new Set();
-		focus=null;
+		focus=new Set();
 	});
-	function graphToString(){
+	function graphToString(selectedPoints){
+		if(selectedPoints==null)selectedPoints=points;
 		let ans='';
-		let arrayOfPoints=Array.from(points);
+		let arrayOfPoints=Array.from(selectedPoints);
 		let arrayOfLines=Array.from(lines);
 		ans+=`
 		{
 			"points":[
 		`;
-		for(let i=0;i<arrayOfPoints.length;i++){
+		let firstPoint=true;
+		for(let i=0;i<arrayOfPoints.length;i++)if(arrayOfPoints[i].getType()=='Point'){
 			arrayOfPoints[i].count=i;
 			ans+=`
-				{
+				${firstPoint?'':','}{
 					"x":${arrayOfPoints[i].getX()},
 					"y":${arrayOfPoints[i].getY()},
 					"power":${arrayOfPoints[i].getPower()}
-				}${i==arrayOfPoints.length-1?'':','}
+				}
 			`;
+			firstPoint=false;
 		}
 		ans+=`
 			],
@@ -405,14 +558,18 @@ $(function(){
 		function findPoint(point){
 			return point.count;
 		}
+		let firstLine=true;
 		for(let i=0;i<arrayOfLines.length;i++){
-			ans+=`
-				{
-					"pointFrom":${findPoint(arrayOfLines[i].getPointFrom())},
-					"pointTo":${findPoint(arrayOfLines[i].getPointTo())},
-					"notGate":${arrayOfLines[i].getNotGate()}
-				}${i==arrayOfLines.length-1?'':','}
-			`;
+			if(selectedPoints.has(arrayOfLines[i].getPointFrom())&&selectedPoints.has(arrayOfLines[i].getPointTo())){
+				ans+=`
+					${firstLine?'':','}{
+						"pointFrom":${findPoint(arrayOfLines[i].getPointFrom())},
+						"pointTo":${findPoint(arrayOfLines[i].getPointTo())},
+						"notGate":${arrayOfLines[i].getNotGate()}
+					}
+				`;
+				firstLine=false;
+			}
 		}
 		ans+=`
 			]
