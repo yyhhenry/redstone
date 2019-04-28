@@ -525,11 +525,6 @@ $(function(){
 		}
 		focus=new Set(pointsList);
 	}
-	$('#clearGraph').click(function(){
-		points=new Set();
-		lines=new Set();
-		focus=new Set();
-	});
 	function graphToString(selectedPoints){
 		if(selectedPoints==null)selectedPoints=points;
 		let ans='';
