@@ -1,39 +1,127 @@
 'use strict';
 $(function(){
-	let canvas=document.getElementById('canvas');
-	let context=canvas.getContext('2d');
-	let clientWidth;
-	let clientHeight;
-	function onresize(){
-		clientWidth=$(window).width();
-		clientHeight=$(window).height();
-		canvas.width=clientWidth;
-		canvas.height=clientHeight;
-	}
-	onresize();
-	$(window).resize(onresize);
+	//定义对象
+	let ZSet;
 	let Point;
 	let Line;
-	let points=new Set();
-	let lines=new Set();
-	let powerValue=30;
-	let tick=1000;
-	let focus=new Set();
-	let ctrl=false;
-	let shift=false;
+	
+	//常量
+	const canvas=document.getElementById('canvas');
+	const context=canvas.getContext('2d');
+	const powerValue=30;
+	
+	//变量
+	let clientWidth;
+	let clientHeight;
+	
+	let points;
+	let lines;
+	let focus;
+	
+	let ctrl;
+	let shift;
+	let movePoint;
+	let selectRect;
+	let mousePosition;
+	let getFocus;
+	
+	//实现对象
+	ZSet=function(rev){
+		if(rev==null)rev=false;
+		let thisZSet=this;
+		let data=new Set();
+		this.clear=function(){
+			rev=false;
+			data=new Set();
+			return thisZSet;
+		}
+		this.add=function(v){
+			if(rev){
+				data.delete(v);
+			}else{
+				data.add(v);
+			}
+			return thisZSet;
+		}
+		this.delete=function(v){
+			if(rev){
+				data.add(v);
+			}else{
+				data.delete(v);
+			}
+			return thisZSet;
+		}
+		this.size=function(){
+			if(rev){
+				return null;
+			}else{
+				return data.size;
+			}
+		}
+		this.has=function(v){
+			if(rev){
+				return !data.has(v);
+			}else{
+				return data.has(v);
+			}
+		}
+		this.forEach=function(f){
+			if(!rev){
+				let array=Array.from(data);
+				for(let i=0;i<array.length;i++){
+					f(array[i]);
+				}
+			}
+			return thisZSet;
+		}
+		this.clone=function(){
+			let ans=new ZSet(rev);
+			this.forEach(function(value){
+				if(rev){
+					ans.delete(value);
+				}else{
+					ans.add(value);
+				}
+			});
+			return ans;
+		}
+		this.and=function(zset){
+			let ans=new ZSet();
+			this.forEach(function(value){
+				if(zset.has(value)){
+					ans.add(value);
+				}
+			});
+			return ans;
+		}
+		this.or=function(zset){
+			let ans=zset.clone();
+			this.forEach(function(value){
+				ans.add(value);
+			});
+			return ans;
+		}
+		this.not=function(zset){
+			let ans=new ZSet(true);
+			this.forEach(function(value){
+				ans.delete(value);
+			});
+			return ans;
+		}
+	}
 	Point=function(x,y){
 		let thisPoint=this;
-		let connectedLines=new Set();
-		let connectedPoints=new Set();
+		let connectedLines=new ZSet();
+		let connectedPoints=new ZSet();
 		points.add(this);
 		let power=false;
 		let value=0;
-		this.click=function(event){
+		this.click=function(){
 			function dis(x1,y1,x2,y2){
 				return Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
 			}
-			if(event.clientX>=x-10&&event.clientX<=x+10&&event.clientY>=y-10&&event.clientY<=y+10){
-				return dis(event.clientX,event.clientY,x,y);
+			if(mousePosition.x>=x-10&&mousePosition.x<=x+10&&mousePosition.y>=y-10&&mousePosition.y<=y+10){
+				return dis(mousePosition.x,mousePosition.y,x,y);
 			}
 			return null;
 		}
@@ -55,28 +143,6 @@ $(function(){
 		this.fresh=function(f){
 			let newValue=0;
 			if(power)newValue=powerValue;
-			let cnt=connectedLines.size;
-			function test(){
-				if(newValue!=value){
-					value=newValue;
-					connectedLines.forEach(function(line){
-						if(line.getNotGate()){
-							if(line.getPointFrom()==thisPoint){
-								setTimeout(line.getPointTo().fresh,0);
-							}
-						}else{
-							if(line.getPointFrom()==thisPoint){
-								setTimeout(line.getPointTo().fresh,0);
-							}else{
-								setTimeout(line.getPointFrom().fresh,0);
-							}
-						}
-					});
-				}
-			}
-			if(cnt==0){
-				test();
-			}
 			connectedLines.forEach(function(line){
 				if(line.getNotGate()){
 					if(line.getPointTo()==thisPoint&&line.getPointFrom().getValue()==0){
@@ -89,11 +155,23 @@ $(function(){
 						newValue=Math.max(newValue,line.getPointTo().getValue()-1);
 					}
 				}
-				cnt--;
-				if(cnt==0){
-					test();
-				}
 			});
+			if(newValue!=value){
+				value=newValue;
+				connectedLines.forEach(function(line){
+					if(line.getNotGate()){
+						if(line.getPointFrom()==thisPoint){
+							setTimeout(line.getPointTo().fresh,0);
+						}
+					}else{
+						if(line.getPointFrom()==thisPoint){
+							setTimeout(line.getPointTo().fresh,0);
+						}else{
+							setTimeout(line.getPointFrom().fresh,0);
+						}
+					}
+				});
+			}
 		}
 		this.hasLineTo=function(point){
 			return connectedPoints.has(point);
@@ -148,30 +226,20 @@ $(function(){
 			}
 			context.fillRect(x-10,y-10,20,20);
 		}
-		this.has=function(point){
-			let edges=Array.from(connectedLines);
-			for(let i=0;i<edges.length;i++){
-				if(edges[i].getPointFrom()==point)return true;
-				if(edges[i].getPointTo()==point)return true;
-			}
-			return false;
-		}
 	}
 	Line=function(pointFrom,pointTo){
 		let thisLine=this;
-		if(pointFrom.hasLineTo(pointTo)){
-			return;
-		}
+		if(pointFrom==pointTo||pointFrom.hasLineTo(pointTo))return;
 		lines.add(this);
 		let notGate=false;
 		let swap=false;
-		this.click=function(event){
+		this.click=function(){
 			function dis(x1,y1,x2,y2){
 				return Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
 			}
 			let len=dis(pointFrom.getX(),pointFrom.getY(),pointTo.getX(),pointTo.getY());
-			let lenl=dis(pointFrom.getX(),pointFrom.getY(),event.clientX,event.clientY);
-			let lenr=dis(event.clientX,event.clientY,pointTo.getX(),pointTo.getY());
+			let lenl=dis(pointFrom.getX(),pointFrom.getY(),mousePosition.x,mousePosition.y);
+			let lenr=dis(mousePosition.x,mousePosition.y,pointTo.getX(),pointTo.getY());
 			if(lenl>len+15||lenr>len+15)return;
 			let p=(len+lenl+lenr)/2;
 			let v=Math.sqrt(p*(p-len)*(p-lenl)*(p-lenr));
@@ -258,7 +326,11 @@ $(function(){
 			}
 			context.lineTo(pointTo.getX(),pointTo.getY());
 			context.closePath();
-			context.lineWidth=5;
+			if(notGate){
+				context.lineWidth=2.5;
+			}else{
+				context.lineWidth=5;
+			}
 			context.stroke();
 		}
 		pointFrom.addLine(this);
@@ -266,179 +338,129 @@ $(function(){
 		pointFrom.fresh();
 		pointTo.fresh();
 	}
+	
+	
+	//事件
 	$(window).keydown(function(event){
-		if(event.key=='Control'){
+		if(window.event.key=='Control'){
 			ctrl=true;
-		}else if(event.key=='Shift'){
+		}else if(window.event.key=='Shift'){
 			shift=true;
-		}
-	});
-	$(window).keyup(function(event){
-		if(event.key=='Control'){
-			ctrl=false;
-		}else if(event.key==' '){
-			let _focus=Array.from(focus);
-			for(let i=0;i<_focus.length;i++){
-				let focusi=_focus[i];
+			focus.forEach(function(focusi){
+				if(focusi.getType()=='Line'){
+					focus.delete(focusi);
+				}
+			});
+		}else if(window.event.key==' '){
+			focus.forEach(function(focusi){
 				if(focusi.getType()=='Point'){
 					focusi.setPower();
 				}else{
 					focusi.setNotGate();
 				}
-			}
-		}else if(event.key=='Delete'){
-			let _focus=Array.from(focus);
-			for(let i=0;i<_focus.length;i++){
-				let focusi=_focus[i];
+			});
+		}else if(window.event.key=='Delete'){
+			focus.forEach(function(focusi){
 				if(focusi.getType()=='Line'){
 					focusi.delete();
 				}
-			}
-			for(let i=0;i<_focus.length;i++){
-				let focusi=_focus[i];
+			});
+			focus.forEach(function(focusi){
 				if(focusi.getType()=='Point'){
 					focusi.delete();
 				}
-			}
-			focus=new Set();
-		}else if(event.key=='Shift'){
-			shift=false;
-		}else if(ctrl&&event.key=='a'){
-			focus=new Set(Array.from(points));
-		}else if(ctrl&&event.key=='c'){
+			});
+			focus.clear();
+		}else if(window.event.key=='a'){
+			if(!ctrl)return;
+			focus=points.clone();
+		}else if(window.event.key=='c'){
+			if(!ctrl)return;
 			window.localStorage.clipboard=graphToString(focus);
-		}else if(ctrl&&event.key=='v'){
+		}else if(window.event.key=='v'){
+			if(!ctrl)return;
 			stringToGraph(window.localStorage.clipboard);
-		}else if(ctrl&&event.key=='x'){
+		}else if(window.event.key=='x'){
+			if(!ctrl)return;
 			window.localStorage.clipboard=graphToString(focus);
-			let _focus=Array.from(focus);
-			for(let i=0;i<_focus.length;i++){
-				let focusi=_focus[i];
+			focus.forEach(function(focusi){
 				if(focusi.getType()=='Line'){
 					focusi.delete();
 				}
-			}
-			for(let i=0;i<_focus.length;i++){
-				let focusi=_focus[i];
+			});
+			focus.forEach(function(focusi){
 				if(focusi.getType()=='Point'){
 					focusi.delete();
 				}
-			}
-			focus=new Set();
+			});
+			focus.clear();
 		}
 	});
-	let movePoint=false;
-	let selectRect=null;
-	let place={x:0,y:0};
+	$(window).keyup(function(event){
+		if(window.event.key=='Control'){
+			ctrl=false;
+		}else if(window.event.key=='Shift'){
+			shift=false;
+		}
+	});
 	$(window).mousedown(function(event){
-		place.x=event.clientX;
-		place.y=event.clientY;
+		if(event.button!=0)return;
 		if(ctrl){
-			if(focus.size==0){
-				focus=new Set([new Point(event.clientX,event.clientY)]);
-			}else{
-				let _focus=Array.from(focus);
-				let _points=Array.from(points);
-				let ans=null;
-				for(let i=0;i<_points.length;i++){
-					let point=_points[i];
-					if(!focus.has(ans)&&point.click(event)!=null){
-						ans=point;
-					}
-				}
-				if(ans==null){
-					ans=new Point(event.clientX,event.clientY);
-				}
-				for(let i=0;i<_focus.length;i++){
-					let focusi=_focus[i];
-					if(focusi.getType()=='Point'){
-						new Line(focusi,ans);
-					}
-				}
-				focus=new Set([ans]);
+			let focusedPoint=getFocus(points);
+			if(focusedPoint==null){
+				focusedPoint=new Point(mousePosition.x,mousePosition.y);
 			}
+			focus.forEach(function(focusi){
+				if(focusi.getType()=='Point'){
+					new Line(focusi,focusedPoint);
+				}
+			});
+			focus.clear().add(focusedPoint);
 			movePoint=true;
 		}else if(shift){
-			let _points=Array.from(points);
-			let ans=null;
-			let ansValue=-1;
-			for(let i=0;i<_points.length;i++){
-				let point=_points[i];
-				let tot=point.click(event);
-				if(tot==null)continue;
-				if(ans==null||tot<ansValue){
-					ans=point;
-					ansValue=tot;
-				}
-			}
-			if(ans!=null){
-				if(focus.has(ans)){
-					focus.delete(ans);
+			let focusedPoint=getFocus(points);
+			if(focusedPoint!=null){
+				if(focus.has(focusedPoint)){
+					focus.delete(focusedPoint);
 				}else{
-					focus.add(ans);
+					focus.add(focusedPoint);
 				}
 			}else{
 				selectRect={
-					x:event.clientX,
-					y:event.clientY,
+					x:mousePosition.x,
+					y:mousePosition.y,
 					width:0,
 					height:0
 				};
 			}
 		}else{
-			movePoint=false;
-			let _focus=Array.from(focus);
-			for(let i=0;i<_focus.length;i++){
-				let focusi=_focus[i];
-				if(focusi.getType()=='Point'){
-					if(focusi.click(event)!=null){
-						movePoint=true;
-					}
-				}
-			}
-			if(!movePoint){
-				let _points=Array.from(points);
-				let ans=null;
-				let ansValue=-1;
-				for(let i=0;i<_points.length;i++){
-					let point=_points[i];
-					let tot=point.click(event);
-					if(tot==null)continue;
-					if(ans==null||tot<ansValue){
-						ans=point;
-						ansValue=tot;
-					}
-				}
-				if(ans==null){
-					let _lines=Array.from(lines);
-					for(let i=0;i<_lines.length;i++){
-						let line=_lines[i];
-						let tot=line.click(event);
-						if(tot==null)continue;
-						if(ans==null||tot<ansValue){
-							ans=line;
-							ansValue=tot;
-						}
-					}
-				}
-				if(ans!=null){
-					focus=new Set([ans]);
+			let focusedPoint=getFocus(focus.and(points));
+			if(focusedPoint!=null){
+				movePoint=true;
+			}else{
+				focusedPoint=getFocus(points.and(focus.not()));
+				if(focusedPoint!=null){
 					movePoint=true;
+					focus.clear().add(focusedPoint);
 				}else{
-					focus=new Set();
+					movePoint=false;
+					let focusedLine=getFocus(lines);
+					if(focusedLine!=null){
+						focus.clear().add(focusedLine);
+					}else{
+						selectRect={
+							x:mousePosition.x,
+							y:mousePosition.y,
+							width:0,
+							height:0
+						};
+					}
 				}
-			}
-			if(!movePoint){
-				selectRect={
-					x:event.clientX,
-					y:event.clientY,
-					width:0,
-					height:0
-				};
 			}
 		}
 	});
 	$(window).mouseup(function(event){
+		if(event.button!=0)return;
 		movePoint=false;
 		if(selectRect!=null){
 			if(selectRect.width<0){
@@ -450,11 +472,9 @@ $(function(){
 				selectRect.height=-selectRect.height;
 			}
 			if(!shift){
-				focus=new Set();
+				focus.clear();
 			}
-			let _points=Array.from(points);
-			for(let i=0;i<_points.length;i++){
-				let point=_points[i];
+			points.forEach(function(point){
 				if(point.getX()>=selectRect.x&&point.getY()>=selectRect.y&&point.getX()<=selectRect.x+selectRect.width&&point.getY()<=selectRect.y+selectRect.height){
 					if(!shift){
 						focus.add(point);
@@ -466,56 +486,106 @@ $(function(){
 						}
 					}
 				}
-			}
+			});
 			selectRect=null;
 		}
 	});
 	$(window).mousemove(function(event){
 		if(movePoint){
-			let _focus=Array.from(focus);
-			for(let i=0;i<_focus.length;i++){
-				let focusi=_focus[i];
+			focus.forEach(function(focusi){
 				if(focusi.getType()=='Point'){
-					focusi.move(event.clientX-place.x,event.clientY-place.y);
+					focusi.move(event.clientX-mousePosition.x,event.clientY-mousePosition.y);
 				}
-			}
+			});
 		}else if(selectRect!=null){
 			selectRect.width=event.clientX-selectRect.x;
 			selectRect.height=event.clientY-selectRect.y;
 		}
-		place.x=event.clientX;
-		place.y=event.clientY;
+		mousePosition.x=event.clientX;
+		mousePosition.y=event.clientY;
 	});
-	window.requestAnimationFrame=window.requestAnimationFrame||window.webkitRequestAnimationFrame||window.mozRequestAnimationFrame;
+	window.onmousewheel=function(event){
+		let step=-window.event.deltaY/100;
+		for(let i=0;i<step;i++){
+			points.forEach(function(point){
+				point.moveTo((point.getX()-mousePosition.x)*0.9+mousePosition.x,(point.getY()-mousePosition.y)*0.9+mousePosition.y);
+			});
+		}
+		for(let i=0;i<-step;i++){
+			points.forEach(function(point){
+				point.moveTo((point.getX()-mousePosition.x)/0.9+mousePosition.x,(point.getY()-mousePosition.y)/0.9+mousePosition.y);
+			});
+		}
+	}
+	$(window).resize(function(){
+		clientWidth=$(window).width();
+		clientHeight=$(window).height();
+		canvas.width=clientWidth;
+		canvas.height=clientHeight;
+	});
+	
+	//绘制
 	function paint(){
 		context.shadowBlur=0;
 		context.fillStyle='rgb(255,255,255)';
 		context.fillRect(0,0,clientWidth,clientHeight);
-		let _lines=Array.from(lines);
-		let _points=Array.from(points);
-		for(let i=0;i<_lines.length;i++){
-			let line=_lines[i];
+		lines.forEach(function(line){
 			line.paint(context);
-		}
-		for(let i=0;i<_points.length;i++){
-			let point=_points[i];
+		});
+		points.forEach(function(point){
 			point.paint(context);
-		}
+		});
 		if(selectRect!=null){
 			context.shadowBlur=0;
 			context.fillStyle='rgba(40,40,160,0.2)';
 			context.fillRect(selectRect.x,selectRect.y,selectRect.width,selectRect.height);
 		}
+		if(ctrl){
+			context.shadowBlur=0;
+			let focusedPoint=getFocus(points);
+			let okay=false;
+			focus.forEach(function(focusi){
+				if(focusi.getType()=='Point'){
+					if(focusedPoint!=null&&focusi==focusedPoint||focusi.hasLineTo(focusedPoint)){
+						context.strokeStyle='rgba(160,160,40,1)';
+					}else{
+						context.strokeStyle='rgba(40,40,160,0.4)';
+						okay=true;
+					}
+					context.beginPath();
+					context.moveTo(focusi.getX(),focusi.getY());
+					if(focusedPoint!=null){
+						context.lineTo(focusedPoint.getX(),focusedPoint.getY());
+					}else{
+						context.lineTo(mousePosition.x,mousePosition.y);
+					}
+					context.closePath();
+					context.lineWidth=5;
+					context.stroke();
+				}
+			});
+			context.fillStyle='rgba(40,40,160,0.4)';
+			if(focusedPoint!=null){
+				if(!okay)context.fillStyle='rgba(160,160,40,1)';
+				context.fillRect(focusedPoint.getX()-10,focusedPoint.getY()-10,20,20);
+			}else{
+				context.fillRect(mousePosition.x-10,mousePosition.y-10,20,20);
+			}
+		}
 		window.requestAnimationFrame(paint);
 	}
-	paint();
+	
+	//存档
 	function stringToGraph(exp){
 		if(exp==null||exp=='')return;
 		exp=JSON.parse(exp);
 		let pointsList=[];
+		focus=new ZSet();
 		for(let i=0;i<exp.points.length;i++){
-			pointsList.push(new Point(exp.points[i].x,exp.points[i].y));
-			if(exp.points[i].power)pointsList[i].setPower();
+			let point=new Point(exp.points[i].x,exp.points[i].y);
+			pointsList.push(point);
+			focus.add(point);
+			if(exp.points[i].power)point.setPower();
 		}
 		for(let i=0;i<exp.lines.length;i++){
 			let line=new Line(pointsList[exp.lines[i].pointFrom],pointsList[exp.lines[i].pointTo]);
@@ -523,70 +593,63 @@ $(function(){
 				line.setNotGate();
 			}
 		}
-		focus=new Set(pointsList);
 	}
 	function graphToString(selectedPoints){
 		if(selectedPoints==null)selectedPoints=points;
-		let ans='';
-		let arrayOfPoints=Array.from(selectedPoints);
-		let arrayOfLines=Array.from(lines);
-		ans+=`
-		{
-			"points":[
-		`;
-		let firstPoint=true;
-		for(let i=0;i<arrayOfPoints.length;i++)if(arrayOfPoints[i].getType()=='Point'){
-			arrayOfPoints[i].count=i;
-			ans+=`
-				${firstPoint?'':','}{
-					"x":${arrayOfPoints[i].getX()},
-					"y":${arrayOfPoints[i].getY()},
-					"power":${arrayOfPoints[i].getPower()}
-				}
-			`;
-			firstPoint=false;
-		}
-		ans+=`
-			],
-			"lines":[
-		`;
-		function findPoint(point){
-			return point.count;
-		}
-		let firstLine=true;
-		for(let i=0;i<arrayOfLines.length;i++){
-			if(selectedPoints.has(arrayOfLines[i].getPointFrom())&&selectedPoints.has(arrayOfLines[i].getPointTo())){
-				ans+=`
-					${firstLine?'':','}{
-						"pointFrom":${findPoint(arrayOfLines[i].getPointFrom())},
-						"pointTo":${findPoint(arrayOfLines[i].getPointTo())},
-						"notGate":${arrayOfLines[i].getNotGate()}
-					}
-				`;
-				firstLine=false;
-			}
-		}
-		ans+=`
-			]
-		}
-		`;
-		return ans;
+		let ans={points:[],lines:[]};
+		let count=0;
+		selectedPoints.forEach(function(point){
+			if(point.getType()!='Point')return;
+			point.count=count++;
+			ans.points.push({
+				x:point.getX(),
+				y:point.getY(),
+				power:point.getPower()
+			});
+		});
+		lines.forEach(function(line){
+			if(!selectedPoints.has(line.getPointFrom()))return;
+			if(!selectedPoints.has(line.getPointTo()))return;
+			ans.lines.push({
+				pointFrom:line.getPointFrom().count,
+				pointTo:line.getPointTo().count,
+				notGate:line.getNotGate()
+			});
+		});
+		return JSON.stringify(ans);
 	}
 	$(window).unload(function(){
 		window.localStorage.graph=graphToString();
 	});
-	stringToGraph(window.localStorage.graph);
-	window.onmousewheel=function(event){
-		let step=-event.deltaY/100;
-		for(let i=0;i<step;i++){
-			points.forEach(function(point){
-				point.moveTo((point.getX()-event.clientX)*0.9+event.clientX,(point.getY()-event.clientY)*0.9+event.clientY);
-			});
-		}
-		for(let i=0;i<-step;i++){
-			points.forEach(function(point){
-				point.moveTo((point.getX()-event.clientX)/0.9+event.clientX,(point.getY()-event.clientY)/0.9+event.clientY);
-			});
-		}
+	
+	//预处理
+	points=new ZSet();
+	lines=new ZSet();
+	focus=new ZSet();
+	
+	ctrl=false;
+	shift=false;
+	movePoint=false;
+	selectRect=null;
+	mousePosition={};
+	
+	getFocus=function(zset){
+		if(mousePosition.x==null)return;
+		let ans=null;
+		let ansValue=-1;
+		zset.forEach(function(value){
+			let tot=value.click();
+			if(tot==null)return;
+			if(ans==null||tot<ansValue){
+				ans=value;
+				ansValue=tot;
+			}
+		});
+		return ans;
 	}
+	
+	stringToGraph(window.localStorage.graph);
+	focus.clear();
+	$(window).resize();
+	paint();
 });
