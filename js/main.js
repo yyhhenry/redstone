@@ -376,12 +376,14 @@ $(function(){
 			focus=points.clone();
 		}else if(window.event.key=='c'){
 			if(!ctrl)return;
-			window.localStorage.clipboard=graphToString(focus);
+			if(focus.and(points).size()==0)return;
+			window.localStorage.clipboard=graphToString(focus.and(points));
 		}else if(window.event.key=='v'){
 			if(!ctrl)return;
 			stringToGraph(window.localStorage.clipboard);
 		}else if(window.event.key=='x'){
 			if(!ctrl)return;
+			if(focus.and(points).size()==0)return;
 			window.localStorage.clipboard=graphToString(focus);
 			focus.forEach(function(focusi){
 				if(focusi.getType()=='Line'){
