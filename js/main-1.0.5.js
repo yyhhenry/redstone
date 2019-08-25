@@ -12,6 +12,8 @@ $(function(){
 	const setbut=document.getElementById('setbut');
 	const demoView=document.getElementById('demoView');
 	const demo=document.getElementById('demo');
+	const usageView=document.getElementById('usageView');
+	const usage=document.getElementById('usage');
 	const context=canvas.getContext('2d');
 	const powerValue=30;
 	
@@ -24,7 +26,8 @@ $(function(){
 	let texts;
 	let focus;
 	
-	let viewing;
+	let demoViewing;
+	let usageViewing;
 	let adding;
 	let ctrl;
 	let shift;
@@ -503,8 +506,18 @@ $(function(){
 		});
 	});
 	$(demo).click(function(){
+		if(usageViewing){
+			$(usage).click();
+		}
 		$(demoView).slideToggle();
-		viewing=!viewing;
+		demoViewing=!demoViewing;
+	});
+	$(usage).click(function(){
+		if(demoViewing){
+			$(demo).click();
+		}
+		$(usageView).slideToggle();
+		usageViewing=!usageViewing;
 	});
 	$(window).mouseup(function(event){
 		if(event.button!=0)return;
@@ -607,7 +620,12 @@ $(function(){
 			context.fillStyle='rgba(40,40,160,0.2)';
 			context.fillRect(selectRect.x,selectRect.y,selectRect.width,selectRect.height);
 		}
-		if(viewing){
+		if(usageViewing){
+			usage.style.background='rgba(180,180,200)';
+		}else{
+			usage.style.background='';
+		}
+		if(demoViewing){
 			demo.style.background='rgba(180,180,200)';
 		}else{
 			demo.style.background='';
@@ -722,7 +740,8 @@ $(function(){
 	focus=new ZSet();
 	texts=new ZSet();
 	
-	viewing=false;
+	demoViewing=false;
+	usageViewing=false;
 	adding=false;
 	ctrl=false;
 	shift=false;
