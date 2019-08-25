@@ -12,13 +12,42 @@
 				-ms-user-select: none;
 				user-select: none;
 			}
+			.menubut {
+				float:left;
+				padding:10px;
+			}
+			.menubut:hover {
+				background:rgb(180,180,200);
+			}
+			.abibut {
+				float:right;
+				padding:10px;
+			}
+			.abibut:hover {
+				background:rgb(180,180,200);
+			}
+			.uabibut {
+				float:right;
+				padding:10px;
+				color:rgb(150,150,150);
+			}
 		</style>
 	</head>
 	<body style='overflow:hidden'>
-		<div style='position:fixed;left:0px;top:0px;z-index:2' class='noselect'>
-			<a href='./导入.html'>导入电路</a>
-			<a href='./导出.html'>导出电路</a>
-			<a href='./demo/index.html'>示例电路</a>
+		<div style='position:fixed;left:0px;top:0px;right:0px;z-index:2;background:rgba(220,220,220,0.8)' class='noselect'>
+			<div onclick="location.href='导入.html'" class='menubut'>导入<br>电路</div>
+			<div onclick="location.href='导出.html'" class='menubut'>导出<br>电路</div>
+			<div id='demo' class='menubut'>示例<br>电路</div>
+			<div id='usage' class='menubut'>使用<br>说明</div>
+			<div style='float:right;width:45%;padding:10px'><br></div>
+			<div id='delbut' class='abibut'>删除<br>元素</div>
+			<div id='setbut' class='abibut'>切换<br>状态</div>
+			<div id='addbut' class='abibut'>添加<br>元素</div>
+		</div>
+		<div id='demoView' style='position:fixed;z-index:2;left:0px;top:70px;display:none;padding:10px;background:rgba(180,180,180,0.8)' class='noselect'>
+			<p><a href='./demo/各种门.html'>各种门</a></p>
+			<p><a href='./demo/触发锁存器.html'>触发锁存器</a></p>
+			<p><a href='./demo/三线自动传输数据.html'>三线自动传输数据</a></p>
 		</div>
 		<canvas id='canvas' style='position:fixed;left:0;top:0;width:100%;height:100%;z-index:1'></canvas>
 		<script src='./js/jquery-1.8.3.js'></script>
