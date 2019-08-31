@@ -355,16 +355,16 @@ $(function(){
 	
 	//事件
 	$(window).keydown(function(event){
-		if(window.event.key=='Control'){
+		if(event.key=='Control'){
 			ctrl=true;
-		}else if(window.event.key=='Shift'){
+		}else if(event.key=='Shift'){
 			shift=true;
 			focus.forEach(function(focusi){
 				if(focusi.getType()=='Line'){
 					focus.delete(focusi);
 				}
 			});
-		}else if(window.event.key==' '){
+		}else if(event.key==' '){
 			focus.forEach(function(focusi){
 				if(focusi.getType()=='Point'){
 					focusi.setPower();
@@ -372,7 +372,7 @@ $(function(){
 					focusi.setNotGate();
 				}
 			});
-		}else if(window.event.key=='Delete'){
+		}else if(event.key=='Delete'){
 			focus.forEach(function(focusi){
 				if(focusi.getType()=='Line'){
 					focusi.delete();
@@ -384,20 +384,20 @@ $(function(){
 				}
 			});
 			focus.clear();
-		}else if(window.event.key=='a'){
+		}else if(event.key=='a'){
 			if(ctrl){
 				focus=points.clone();
 			}else{
 				adding=!adding;
 			}
-		}else if(window.event.key=='c'){
+		}else if(event.key=='c'){
 			if(!ctrl)return;
 			if(focus.and(points).size()==0)return;
 			window.localStorage.clipboard=graphToString(focus.and(points),false);
-		}else if(window.event.key=='v'){
+		}else if(event.key=='v'){
 			if(!ctrl)return;
 			stringToGraph(window.localStorage.clipboard);
-		}else if(window.event.key=='x'){
+		}else if(event.key=='x'){
 			if(!ctrl)return;
 			if(focus.and(points).size()==0)return;
 			window.localStorage.clipboard=graphToString(focus,false);
@@ -415,9 +415,9 @@ $(function(){
 		}
 	});
 	$(window).keyup(function(event){
-		if(window.event.key=='Control'){
+		if(event.key=='Control'){
 			ctrl=false;
-		}else if(window.event.key=='Shift'){
+		}else if(event.key=='Shift'){
 			shift=false;
 		}
 	});
@@ -564,8 +564,8 @@ $(function(){
 		mousePosition.x=event.clientX;
 		mousePosition.y=event.clientY;
 	});
-	window.onmousewheel=function(event){
-		let step=-window.event.deltaY/100;
+	window.onwheel=window.onmousewheel=function(event){
+		let step=-event.deltaY/100;
 		for(let i=0;i<step;i++){
 			points.forEach(function(point){
 				point.moveTo((point.getX()-mousePosition.x)*0.9+mousePosition.x,(point.getY()-mousePosition.y)*0.9+mousePosition.y);
